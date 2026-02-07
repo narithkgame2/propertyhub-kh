@@ -925,6 +925,8 @@
     mapMarkers: {},
     mapCenter: { lat: 11.5564, lng: 104.9282, zoom: 12 },
     mapSelectedProject: null,
+    mapInitialized: false,
+    mapObserver: null,
     get projectMapListings() {
         return this.projects.map((project) => ({
             name: project.name,
@@ -945,6 +947,27 @@
         if (!project) return '';
         return project.mapLink || `https://maps.google.com/?q=${encodeURIComponent((project.name || '') + ' ' + (project.location || ''))}`;
     },
+    initMapWhenVisible() {
+        if (this.mapInitialized) return;
+        const el = document.getElementById('project-map');
+        if (!el) return;
+        if (!('IntersectionObserver' in window)) {
+            this.initMap();
+            this.mapInitialized = true;
+            return;
+        }
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    this.initMap();
+                    this.mapInitialized = true;
+                    if (this.mapObserver) this.mapObserver.disconnect();
+                }
+            });
+        }, { threshold: 0.2 });
+        observer.observe(el);
+        this.mapObserver = observer;
+    },
     initMap() {
         if (this.mapInstance) return;
         const el = document.getElementById('project-map');
@@ -952,16 +975,26 @@
         this.mapInstance = window.L.map(el, {
             scrollWheelZoom: false,
             zoomControl: true,
-            preferCanvas: true
+            preferCanvas: true,
+            zoomAnimation: false,
+            markerZoomAnimation: false,
+            fadeAnimation: false,
+            updateWhenIdle: true,
+            updateWhenZooming: false
         }).setView([this.mapCenter.lat, this.mapCenter.lng], this.mapCenter.zoom);
 
         el.classList.add('map-dark');
         window.L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             maxZoom: 19,
-            attribution: '&copy; OpenStreetMap'
+            attribution: '&copy; OpenStreetMap',
+            updateWhenIdle: true,
+            updateWhenZooming: false
         }).addTo(this.mapInstance);
 
         this.renderMapPins();
+        setTimeout(() => {
+            if (this.mapInstance) this.mapInstance.invalidateSize();
+        }, 50);
     },
     renderMapPins() {
         if (!this.mapInstance || !window.L) return;
@@ -2655,7 +2688,7 @@ projects: [
         form.reset();
     },
 }"
-    x-init="if (window.innerWidth &lt; 768) { viewMode = 'grid'; insightViewMode = 'grid'; } updateThumbLimit(); window.addEventListener('resize', () =&gt; updateThumbLimit()); window.addEventListener('popstate', () =&gt; { if (overlayDepth &gt; 0) { isHandlingPop = true; closeTopOverlay(); overlayDepth = Math.max(0, overlayDepth - 1); isHandlingPop = false; return; } }); window.addEventListener('touchstart', (event) =&gt; { if (overlayDepth &lt;= 0) return; const touch = event.touches &amp;&amp; event.touches[0]; if (!touch) return; touchStartX = touch.clientX; touchStartY = touch.clientY; }, { passive: true }); window.addEventListener('touchend', (event) =&gt; { if (overlayDepth &lt;= 0) return; const touch = event.changedTouches &amp;&amp; event.changedTouches[0]; if (!touch) return; const dx = touch.clientX - touchStartX; const dy = touch.clientY - touchStartY; const absX = Math.abs(dx); const absY = Math.abs(dy); if (dx &gt; 60 &amp;&amp; absY &lt; 40) { closeOverlayState(); return; } if (dy &gt; 80 &amp;&amp; absX &lt; 40) { closeOverlayState(); return; } }, { passive: true }); const params = new URLSearchParams(window.location.search); const pageParam = params.get('page'); if (pageParam) { currentPage = pageParam; skipScrollOnce = true; } initFavorites(); $watch('currentPage', () =&gt; { if (skipScrollOnce) { skipScrollOnce = false; $nextTick(() =&gt; lucide.createIcons()); return; } scrollToTop(); $nextTick(() =&gt; lucide.createIcons()); }); $nextTick(() =&gt; { lucide.createIcons(); initMap(); if (pageParam) { try { const stored = localStorage.getItem(lastScrollKey); const y = stored ? Number(stored) : 0; if (!Number.isNaN(y)) { window.scrollTo({ top: y, behavior: 'auto' }); } } catch (_) {} } });"
+    x-init="if (window.innerWidth &lt; 768) { viewMode = 'grid'; insightViewMode = 'grid'; } updateThumbLimit(); window.addEventListener('resize', () =&gt; updateThumbLimit()); window.addEventListener('popstate', () =&gt; { if (overlayDepth &gt; 0) { isHandlingPop = true; closeTopOverlay(); overlayDepth = Math.max(0, overlayDepth - 1); isHandlingPop = false; return; } }); window.addEventListener('touchstart', (event) =&gt; { if (overlayDepth &lt;= 0) return; const touch = event.touches &amp;&amp; event.touches[0]; if (!touch) return; touchStartX = touch.clientX; touchStartY = touch.clientY; }, { passive: true }); window.addEventListener('touchend', (event) =&gt; { if (overlayDepth &lt;= 0) return; const touch = event.changedTouches &amp;&amp; event.changedTouches[0]; if (!touch) return; const dx = touch.clientX - touchStartX; const dy = touch.clientY - touchStartY; const absX = Math.abs(dx); const absY = Math.abs(dy); if (dx &gt; 60 &amp;&amp; absY &lt; 40) { closeOverlayState(); return; } if (dy &gt; 80 &amp;&amp; absX &lt; 40) { closeOverlayState(); return; } }, { passive: true }); const params = new URLSearchParams(window.location.search); const pageParam = params.get('page'); if (pageParam) { currentPage = pageParam; skipScrollOnce = true; } initFavorites(); $watch('currentPage', () =&gt; { if (skipScrollOnce) { skipScrollOnce = false; $nextTick(() =&gt; lucide.createIcons()); return; } scrollToTop(); $nextTick(() =&gt; lucide.createIcons()); }); $nextTick(() =&gt; { lucide.createIcons(); initMapWhenVisible(); if (pageParam) { try { const stored = localStorage.getItem(lastScrollKey); const y = stored ? Number(stored) : 0; if (!Number.isNaN(y)) { window.scrollTo({ top: y, behavior: 'auto' }); } } catch (_) {} } });"
     x-effect="document.documentElement.lang = lang"
     class="text-slate-800 selection:bg-[#D4A760] selection:text-white pb-20 lg:pb-0"
   >
